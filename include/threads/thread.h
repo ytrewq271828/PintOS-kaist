@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -91,7 +92,14 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-
+	int64_t suspend_ticks; 				/* Ticks to be suspended for. */
+	//struct semaphore sema;
+	struct lock *lock; 					/* Lock of current thread - NULL if not blocked */
+	int donate_flag;					/* 1 if the thread donated the priority to other thread - otherwise 0 */
+	int donated_flag;					/* 1 if the thread is donated the priority by other thread - otherwise 0 */
+	struct list donated_list;		/* List of priorities donated (Multiple donation is possible) */
+	//struct list donee;				/* List of priority donees of the thread */
+	//struct thread *lock_holder;		/* The lock holder of current blocked thread */
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -133,8 +141,14 @@ const char *thread_name (void);
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 
+void thread_suspend (int64_t);
+bool thread_tick_compare(const struct list_elem *temp1, const struct list_elem *temp2, void *aux);
+void thread_unsuspend (int64_t);
+
+bool thread_priority_compare(const struct list_elem *temp1, const struct list_elem *temp2, void *aux);
 int thread_get_priority (void);
 void thread_set_priority (int);
+bool whether_to_yield(void);
 
 int thread_get_nice (void);
 void thread_set_nice (int);

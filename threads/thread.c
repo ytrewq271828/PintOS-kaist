@@ -27,7 +27,10 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+/* List of threads in suspended state. Implemented for 1-1 : Alarm Clock*/
+static struct list suspend_list;
 
+static struct semaphore semaT;
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -62,6 +65,8 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+//bool thread_tick_compare(const struct list_elem *temp1, const struct list_elem *temp2, void *aux);
+
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -105,9 +110,10 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
-	/* Init the globla thread context */
+	/* Init the global thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&suspend_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -115,6 +121,8 @@ thread_init (void) {
 	init_thread (initial_thread, "main", PRI_DEFAULT);
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
+	initial_thread->donate_flag=0;
+	initial_thread->donated_flag=0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -204,9 +212,14 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-	/* Add to run queue. */
+	list_init(&t->donated_list);
 	thread_unblock (t);
 
+	/* Add to run queue. */
+	if(!whether_to_yield()) // If priority of current thread is larger than that of ready_list
+	{
+		thread_yield();	
+	}
 	return tid;
 }
 
@@ -240,7 +253,12 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	//FIFO implementation : list_push_back
+	//But we need to check the priority of threads via "priority" element of threads
+	
+	//list_push_back (&ready_list, &t->elem); // Original
+	list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
+
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -303,21 +321,144 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered (&ready_list, &curr->elem, thread_priority_compare, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+void
+thread_suspend(int64_t suspendTicks) {
+	struct thread *currThread=thread_current(); // Current thread
+	enum intr_level old_level; 
+	
+	
+	ASSERT (!intr_context()); // Check if the CPU is ready to receive interrupts
+	if (currThread!=idle_thread) // Unless otherwise idle
+	{
+		//sema_init(&semaT, 0);
+		//printf("Going to Suspend\n");
+		old_level=intr_disable(); // Temporarily disable the interrupt. return value : INTR_ON
+		currThread->suspend_ticks=suspendTicks; // Set the suspend_ticks parameter value of current thread
+		list_push_front (&suspend_list, &currThread->elem); // Put the current job in the suspended state list
+		//list_insert_ordered (&suspend_list,&currThread->elem, thread_tick_compare, NULL);
+		//printf("Pushed to suspend_list\n");
+		//sema_down(&semaT);
+		thread_block(); // Block the thread until thread_unblock() is called. Will not be run.
+		
+		// Sorting : just to call list_remove only once inside the while block
+		// I initially called list_next but it gives me odd behaviors consistently
+		// So I sorted the suspend_list to use break statement
+		list_sort(&suspend_list, thread_tick_compare, NULL);
+		intr_set_level (old_level); // Enables CPU of interrupt again
+	}
+	
+}
+// Helper function to sort the suspend_list at the below function
+bool
+thread_tick_compare(const struct list_elem *temp1, const struct list_elem *temp2, void *aux) {
+	int64_t tick1=list_entry(temp1, struct thread, elem)->suspend_ticks;
+	int64_t tick2=list_entry(temp2, struct thread, elem)->suspend_ticks;
+	return tick1<tick2;
+}
+void
+thread_unsuspend(int64_t unsuspendTicks) {
+	// Jobs of each thread are in the suspend_list
+	
+	struct list_elem *element=list_begin(&suspend_list); // To iterate through the suspend_list
+	//struct list_elem *tail_sl=list_tail(&suspend_list);
+	//struct list_elem *currThread=list_begin(&suspend_list);
+	//struct list_elem *element;
+		
+
+	while(!list_empty(&suspend_list))// End condition of iteration
+	//while(currThread!=list_end(&suspend_list))
+	{
+		element=list_pop_front(&suspend_list);
+		struct thread *currThread=list_entry(element, struct thread, elem); // Get the elem of entry struct element
+		//struct thread *currJob=element;
+		//printf("Unsuspend loop on\n");
+		if(unsuspendTicks<currThread->suspend_ticks){  // if the parameter unsuspendTick is smaller than the 
+													   // suspend_ticks value of the thread of entry element
+			//element=list_remove(element);
+			//currThread=list_next(currThread);
+			//printf("Give me next one\n");
+			//continue;
+			//printf("Gonna break\n");
+			list_push_front(&suspend_list, element);
+			list_sort(&suspend_list, thread_tick_compare, NULL);
+			break;
+		}
+		
+
+		//printf("Semaphore next\n");
+		//sema_up(&semaT);
+		thread_unblock(currThread);
+		//barrier();
+		//element=list_remove(element); // Loop condition	
+		//if(list_empty(&suspend_list)){
+		//	break;
+		//}
+		//struct thread *currThread=list_entry(element, struct thread, elem);
+		
+		
+		//printf("Unblocked the thread\n");
+		//currThread=list_remove(currThread);
+		
+	}
+}
+bool
+thread_priority_compare(const struct list_elem *temp1, const struct list_elem *temp2, void *aux) {
+	int64_t priority1=list_entry(temp1, struct thread, elem)->priority;
+	int64_t priority2=list_entry(temp2, struct thread, elem)->priority;
+	//Below return gives me the reverse order, so I changed the direction of inequality.
+	//return priority1<=priority2;
+	return priority1>=priority2;
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	if(!thread_current()->donated_flag)
+	{
+		thread_current ()->priority = new_priority;
+	}
+	//Sorting not required in this function : already sorted by priority in thread_unblock and thread_yield
+	//list_sort(&ready_list, thread_priority_compare, NULL);
+	/*
+	struct thread *priority_max_thread=list_entry(list_rbegin(&ready_list), struct thread, elem);
+	if(priority_max_thread->priority<new_priority)
+	{
+		list_push_back(&ready_list, &priority_max_thread->elem);
+	}
+	else
+	{
+		list_insert_ordered(&ready_list, &priority_max_thread, thread_priority_compare, NULL);
+	}
+	*/
+	//struct list_elem *pop_elem=list_remove(&thread_current()->elem);
+	//list_insert_ordered(&ready_list, pop_elem, thread_priority_compare, NULL);
+	else
+	{
+		thread_current()->priority=list_entry(list_begin(&thread_current()->donated_list), struct thread, elem)->priority;
+	}
+
+	if(!whether_to_yield())
+	{
+		thread_yield();
+	}
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) {
 	return thread_current ()->priority;
+}
+
+// Returns whether the current thread's priority is lower than that of the first element of ready_list. 
+bool
+whether_to_yield(void) {
+	int64_t currPriority=thread_current()->priority;
+	int64_t readyPriority=list_entry(list_begin(&ready_list), struct thread, elem)->priority;
+	return currPriority>=readyPriority;
 }
 
 /* Sets the current thread's nice value to NICE. */

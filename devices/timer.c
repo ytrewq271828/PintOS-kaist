@@ -91,10 +91,16 @@ timer_elapsed (int64_t then) {
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
-
+	/*
 	ASSERT (intr_get_level () == INTR_ON);
 	while (timer_elapsed (start) < ticks)
 		thread_yield ();
+	*/
+	ASSERT (intr_get_level () == INTR_ON); //Check if CPU is ready to receive the interrupt
+	thread_suspend(start+ticks); 
+	//Suspend the threads whose suspend_ticks values are equal to start + ticks 
+	//start + ticks : the number of ticks from the beginning
+
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -122,10 +128,14 @@ timer_print_stats (void) {
 }
 
 /* Timer interrupt handler. */
+// Called when the timer interrupt occurs
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++;
-	thread_tick ();
+	ticks++; // increment the number of ticks
+	thread_tick (); // Called by timer at every timer tick
+	//printf("\ntimer ticks : Interrupt called\n");
+	thread_unsuspend(ticks);
+	//Unsuspend the threads whose suspend_ticks are equal to the value of parameter ticks 
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
