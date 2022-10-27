@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "string.h": "c",
+        "interrupt.h": "c",
+        "intr-stubs.h": "c",
+        "thread.h": "c"
+    }
+}
