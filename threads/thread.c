@@ -225,7 +225,7 @@ thread_create (const char *name, int priority,
 		//for(;;);
 		return TID_ERROR;
 	}
-	t->running_executable=NULL;
+	//t->running_executable=NULL;
 	t->open_index=2; /* Opened file index starts from 2 */
 	t->descriptor_table[0]=0;
 	t->descriptor_table[1]=1;

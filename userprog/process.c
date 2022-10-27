@@ -55,14 +55,14 @@ process_create_initd (const char *file_name) {
 	/* Parsing the file name only - call strtok_r just once */
 	char* file_name_token;
 	char *save_ptr;
-	file_name_token=strtok_r(file_name, " ", &save_ptr);
+	strtok_r(file_name, " ", &save_ptr);
 	
 	
 	/* Create a new thread to execute FILE_NAME. */
 	//tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 	//tid=thread_create(fn_copy, PRI_DEFAULT, initd, file_name);
 	
-	tid=thread_create(file_name_token, PRI_DEFAULT, initd, fn_copy);
+	tid=thread_create(file_name, PRI_DEFAULT, initd, fn_copy);
 	//tid=thread_create(file_name, PRI_DEFAULT, initd, file_name);
 	if (tid == TID_ERROR)
 	{
@@ -111,7 +111,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	//struct list_elem *elem;
 	//struct thread *child=NULL;
 	//struct thread *currentt=thread_current();
-	struct thread *child=find_child(pid);
+	struct thread *child=find_child(current, pid);
 	//if(child!=NULL)
 	//{
 		//for(;;);
@@ -266,7 +266,7 @@ error:
 2.1. Argument Passing 
 This function tokenizes the command line - into command and arguments
 */
-void command_tokenize(char **argv, int argc, void** rsp_copy)
+void command_tokenize(char **argv, int argc, void* rsp_copy)
 {
    //char *len_pointer;					/* Pointer to determine the number of arguments */
    //int space_flag=1; 					/* Flag to check the space in the command line */
@@ -286,78 +286,6 @@ void command_tokenize(char **argv, int argc, void** rsp_copy)
    //int *argv_last;
    uint8_t word_align_len=0;
    //int argv_flag=0; 					/* Flag to discriminate arguemnts and command */
-   
-   /*First iteration through command : to confirm argc value, the length of stack (malloc) */
-   //for (token = strtok_r (command, " ", &save_ptr1); token != NULL; token = strtok_r (NULL, " ", &save_ptr1))
-   //{
-	//	argc++;
-	//	printf("%d\n", argc);
-   //}
-   //(char**)argv_stack=malloc(sizeof(char*)*argc);
-   //(char**)argv_address_stack=malloc(sizeof(char*)*argc);
-   
-   /* Loop to check the number of arguments */
-   /*
-   for(int i=0;i<strlen(command);i++)
-   {
-	if(space_flag)
-	{	
-		
-		if(!strcmp(command[i], " "))
-		{
-			continue;
-		}
-	}
-	else
-	{
-		space_flag=0;
-		if(!strcmp(command[i]," "))
-		{
-			argc++;
-		}
-		
-		if(!strcmp(command[i-1], " ") && !strcmp(command[i], " "))
-		{
-			argc--;
-		} 
-	}
-   }
-   */
-   //for(;;);
-   /* Save the arguments in the temporary space in the heap area*/
-   //argv_temp=(char**)malloc(sizeof(char*)*argc);
-   
-   /*
-   token = strtok_r (command, " ", &save_ptr1);
-   *token=*token+'\0';
-   argv_temp[arg_index]=token;
-   
-   while(token!=NULL) 
-   //( token != NULL; token = strtok_r (NULL, " ", &save_ptr1))
-   {
-		token = strtok_r (command, " ", &save_ptr1);
-		*token=*token+'\0';
-		arg_index=arg_index+1;
-		//int token_len=strlen(token);	
-		//printf ("'%s'\n", token);
-		//memcpy(argv_temp+arg_index, token, 8);
-		argv_temp[arg_index]=token;
-		//memcpy(current, token, 8);
-		
-		//argc++;
-		
-		//current+=token_len;
-   }
-   argc=arg_index;
-   */
-   
-   /* 
-   The values are going to be pushed into the stack in reverse order
-   From the high address to the low address (That's how the stack grows)
-	*/
-   //argv_start=USER_STACK+(argc+2)*8;
-   //current=stack_start;
-   //current=argv_start;
 	
    for(int i=0;i<argc;i++)
    {
@@ -365,50 +293,37 @@ void command_tokenize(char **argv, int argc, void** rsp_copy)
 		//char argument=argv[(argc-i-1)];
 		int arg_size=strlen(argv[argc-i-1]);
 		//memmove(rsp-arg_size, rsp, stack_size);
-		*rsp_copy=*rsp_copy-(arg_size+1);
+		rsp_copy=rsp_copy-(arg_size+1);
 		//void *rspp=(void *)if_->rsp;
-		memcpy(*rsp_copy, argv[argc-i-1], (arg_size+1));
-		argv_address_temp[(argc-i-1)]=*rsp_copy;
+		memcpy(rsp_copy, argv[argc-i-1], (arg_size+1));
+		argv_address_temp[(argc-i-1)]=rsp_copy;
 		argv_len=argv_len+(arg_size+1);
    }
    //for(;;);
    /* word-align check : increment while stack size is not a multiple of 8 */
-   while((uint8_t)*rsp_copy%8!=0)
+   while((uint8_t)rsp_copy%8!=0)
    {
 		word_align_len+=1;
 		//stack_size+=1;	
-		*rsp_copy=*rsp_copy-1;
-		**(uint8_t **)rsp_copy=(uint8_t)0;
+		rsp_copy=rsp_copy-1;
+		*(uint8_t *)rsp_copy=(uint8_t)0;
 		//memset(rsp, 0, 1);
    }
-   //memmove(rsp-word_align_len, rsp, stack_size);
-   //rsp=rsp-word_align_len;
-   //memset(rsp, 0, word_align_len);
-   //*argv_last=0;
-   //*word_align=0;
-
-   /* argv[argc] to null pointer */
-   //memmove(rsp-8, rsp, stack_size); 
-   *rsp_copy=*rsp_copy-8;
-   memset(*rsp_copy, 0, 8);
-   //stack_size+=8;
-   
-   //memmove(rsp-8*(argc+1), rsp, stack_size);
-   //rsp=rsp-8;
-   //memset(rsp, 0, 8);
+   rsp_copy=rsp_copy-8;
+   memset(rsp_copy, 0, 8);
 
    /* Allocating stack space for address data*/
    for(int i=0;i<argc;i++)
    {
-		*rsp_copy=*rsp_copy-8;
+		rsp_copy=rsp_copy-8;
 		//char* argument=argv[(argc-i-1)];
-		memcpy(*rsp_copy, &argv_address_temp[(argc-i-1)], 8);
+		memcpy(rsp_copy, &argv_address_temp[(argc-i-1)], 8);
 		//memset(rsp, &argv_address_temp[argc-i-1], 8);
 		//stack_size+=8;
    }
    /* Fake return address */
-   *rsp_copy=*rsp_copy-8;
-   memset(*rsp_copy, 0, 8);
+   rsp_copy=rsp_copy-8;
+   memset(rsp_copy, 0, 8);
    //free(argv_temp);
    //return argc;
 }
@@ -418,6 +333,7 @@ void command_tokenize(char **argv, int argc, void** rsp_copy)
 
 int
 process_exec (void *f_name) {
+	struct thread *current=thread_current();
 	char *file_name=f_name;
 	char file_name_copy[128];
 	bool success;
@@ -439,24 +355,23 @@ process_exec (void *f_name) {
 	
 	printf("$$$$$$$$$$$$$$$\n");
 	printf("%d\n", success);
+	palloc_free_page (file_name);
 	/* If load failed, quit. */
 	if(!success)
 	{
-		//for(;;);
-		palloc_free_page (file_name);
-		return -1;
+		exit(-1);
 	}
-	
-	
+	// Maybe &_if can be wrong
+	// struct thread *current=thread_current();
 	hex_dump(_if.rsp, _if.rsp, USER_STACK-_if.rsp,true);
-
+	printf("%s\n", current->name);
 	do_iret (&_if);
 	NOT_REACHED ();
 }
 
-struct thread* find_child(tid_t tid)
+struct thread* find_child(struct thread *current, tid_t tid)
 {
-	struct thread *current=thread_current();
+	//struct thread *current=thread_current();
 	struct list_elem *e;
 	for(e=list_begin(&current->child_list);e!=list_end(&current->child_list);e=list_next(e))
 	{
@@ -488,15 +403,17 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 	
-	//struct thread *current=thread_current();
+	struct thread *current=thread_current();
+	printf("%s\n\n", current->name);
 	struct list_elem *e;
 	//int flag=0;
 	//ASSERT(!list_empty(&current->child_list));
-	struct thread *child_thread=find_child(child_tid);
+	struct thread *child_thread=find_child(current, child_tid);
 	if(child_thread==NULL)
 	{
 		return -1;
 	}
+	printf("%s**\n", child_thread->name); //args-single
 	//if(flag==0)
 	//{
 	//	return -1;
@@ -505,10 +422,10 @@ process_wait (tid_t child_tid UNUSED) {
 	//{
 		//
 	
-	printf("%d\n", child_thread->exit_status);
-	printf("%d\n", child_thread->tid);
-	ready_list_iterate();
-	printf("----------------------\n");
+	//printf("%d\n", child_thread->exit_status);
+	//printf("%d\n", child_thread->tid);
+	//ready_list_iterate();
+	//printf("----------------------\n");
 	sema_down(&child_thread->wait_sema);
 	int child_exit_status=child_thread->exit_status;
 	//ready_list_iterate();
@@ -526,6 +443,7 @@ void
 process_exit (void) {
 	struct thread *curr = thread_current ();
 	printf("%d", curr->exit_status);
+	printf("%s&&", curr->name);
 	printf("@@@@@@@@@@@@\n");
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
@@ -669,29 +587,15 @@ load (const char *file_name, struct intr_frame *if_) {
 	//for(;;);
 	token = strtok_r (file_name, " ", &save_ptr1);
     //memcpy(argv_cut, token, strlen(token)+1);
-    argv_temp[arg_index]=token;
-	arg_index=arg_index+1;
-	argv_len=argv_len+(strlen(token)+1);
-	ASSERT(strlen(token)!=0);
-	//memcpy(argv_cut, token, strlen(token)+1);
-	while(token!=NULL) 
-    //( token != NULL; token = strtok_r (NULL, " ", &save_ptr1))
-    {
-		token = strtok_r (NULL, " ", &save_ptr1);
-		argv_temp[arg_index]=token;
-		arg_index=arg_index+1;
-		
-    }
-    argc=arg_index-1;
-
+    
 	//command_tokenize(argv_temp, argc, if_->rsp, if_);
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
-
-	file = filesys_open(argv_temp[0]);
+	printf("%s\n", t->name);
+	file = filesys_open(token);
 
 	if (file == NULL) {
 		//lock_release(&t->open_lock);
@@ -723,7 +627,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		struct Phdr phdr;
 		//printf("%d\n", i);
 		if (file_ofs < 0 || file_ofs > file_length (file))
-			goto done;
+			goto done;	
 		file_seek (file, file_ofs);
 
 		if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
@@ -747,8 +651,6 @@ load (const char *file_name, struct intr_frame *if_) {
 					uint64_t file_page = phdr.p_offset & ~PGMASK;
 					
 					uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
-					/* Modified Code */
-					//mem_page=mem_page +  i * PGSIZE;
 					
 					
 					uint64_t page_offset = phdr.p_vaddr & PGMASK;
@@ -769,13 +671,8 @@ load (const char *file_name, struct intr_frame *if_) {
 					
 					if (!load_segment (file, file_page, (void *) mem_page,
 								read_bytes, zero_bytes, writable))
-								{
 									//Fails here
-									
-									goto done;
-								}
-						
-					
+							goto done;
 				}
 				else
 						goto done;
@@ -793,9 +690,23 @@ load (const char *file_name, struct intr_frame *if_) {
 	//for(;;);
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	
-	void **rsp_copy=&if_->rsp;
-	command_tokenize(argv_temp, argc, rsp_copy);
+	argv_temp[arg_index]=token;
+	arg_index=arg_index+1;
+	argv_len=argv_len+(strlen(token)+1);
+	ASSERT(strlen(token)!=0);
+	//memcpy(argv_cut, token, strlen(token)+1);
+	while(token!=NULL) 
+    //( token != NULL; token = strtok_r (NULL, " ", &save_ptr1))
+    {
+		token = strtok_r (NULL, " ", &save_ptr1);
+		argv_temp[arg_index]=token;
+		arg_index=arg_index+1;
+		
+    }
+    argc=arg_index-1;
+
+	//void **rsp_copy=&if_->rsp;
+	command_tokenize(argv_temp, argc, if_->rsp);
 	
 	if_->R.rdi=argc;
 	if_->R.rsi=if_->rsp+8;
@@ -803,7 +714,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	//file_close (file);
+	file_close (file);
 	//for(;;);
 	return success;
 }
@@ -924,25 +835,48 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 /* Create a minimal stack by mapping a zeroed page at the USER_STACK */
-static bool
-setup_stack (struct intr_frame *if_) {
-	
+
+static bool setup_stack(struct intr_frame *if_)
+{
 	uint8_t *kpage;
-	bool success = false;
-	
-	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-	if (kpage != NULL) {
-		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
-		if (success)
-		{
-			if_->rsp = USER_STACK;
-		}
+	bool success=false;
+
+	kpage=palloc_get_multiple(PAL_USER | PAL_ZERO, 1);
+	if (kpage!=NULL)
+	{
+		success=install_page (((uint8_t *)USER_STACK)-PGSIZE, kpage, true);	
+		if(success)
+			if_->rsp=USER_STACK;
 		else
-			palloc_free_page (kpage);
+			palloc_free_page(kpage);
 	}
 	return success;
 }
 
+/*
+static bool
+setup_stack (struct intr_frame *if_, int e_phnum) {
+	
+	uint8_t *kpage;
+	bool success = false;
+	//kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+	for(int i=0;i<e_phnum;i++)
+	{
+		kpage=palloc_get_page(PAL_USER | PAL_ZERO);
+		if (kpage != NULL) {
+			success = install_page (((uint8_t *) USER_STACK) - PGSIZE * (i+1), kpage, true);
+			if (!success)
+			{
+				palloc_free_page (kpage);
+				return success;
+			}
+		}
+	}
+	if_->rsp = USER_STACK;
+			
+	return success;
+}
+*/
 /* Adds a mapping from user virtual address UPAGE to kernel
  * virtual address KPAGE to the page table.
  * If WRITABLE is true, the user process may modify the page;
@@ -956,17 +890,6 @@ static bool
 install_page (void *upage, void *kpage, bool writable) {
 	struct thread *t = thread_current ();
 	
-	//void* temp;
-	//temp=(uint8_t *)KERN_BASE-PGSIZE;
-	//temp=(uint8_t *)KERN_BASE;
-	//memset(temp, 0, PGSIZE);
-	//printf("$$$$$$$$$$$$$$\n");
-	//printf("%x\n", upage);
-	//printf("%x\n", kpage);
-	//ASSERT(!pml4_is_accessed(t->pml4, upage));
-	//if(pml4_get_page(t->pml4, upage)!=NULL)
-	//	for(;;);
-
 	/* Verify that there's not already a page at that virtual
 	 * address, then map our page there. */
 	return (pml4_get_page (t->pml4, upage) == NULL

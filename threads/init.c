@@ -245,8 +245,7 @@ run_task (char **argv) {
 		run_test (task);
 	} else {
 		//for(;;);
-		tid_t tid=process_create_initd(task);
-		process_wait (tid);
+		process_wait(process_create_initd(task));
 		//for(;;);
 	}
 #else

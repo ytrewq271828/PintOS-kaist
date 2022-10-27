@@ -1,7 +1,14 @@
 FAIL
-Kernel panic in run: PANIC at ../../userprog/process.c:89 in initd(): Fail to launch initd
-Call stack: 0x8004219917 0x800421d3d2 0x8004207fe5
+Kernel panic in run: PANIC at ../../filesys/inode.c:304 in inode_allow_write(): assertion `inode->deny_write_cnt > 0' failed.
+Call stack: 0x8004219902 0x80042226ca 0x800422140f 0x800422118e 0x800421de9c 0x80042072f7 0x800421f490 0x800421db45 0x800421d377 0x8004207fd0
 Translation of call stack:
-0x0000008004219917: debug_panic (lib/kernel/debug.c:32)
-0x000000800421d3d2: initd (userprog/process.c:90)
-0x0000008004207fe5: kernel_thread (threads/thread.c:736)
+0x0000008004219902: debug_panic (lib/kernel/debug.c:32)
+0x00000080042226ca: inode_allow_write (filesys/inode.c:305)
+0x000000800422140f: file_allow_write (filesys/file.c:137)
+0x000000800422118e: file_close (filesys/file.c:56)
+0x000000800421de9c: process_exit (userprog/process.c:461)
+0x00000080042072f7: thread_exit (threads/thread.c:339)
+0x000000800421f490: create (userprog/syscall.c:161)
+0x000000800421db45: process_exec (userprog/process.c:366)
+0x000000800421d377: initd (userprog/process.c:88)
+0x0000008004207fd0: kernel_thread (threads/thread.c:736)
