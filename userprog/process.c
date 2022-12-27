@@ -451,7 +451,7 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	for(int i=0;i<fdt_limit;i++)
 	{
-		//printf("%d\n", i);
+		//printf("%d\n", i);fail
 		//printf("!!!!!!!!");
 		close(i);
 	}
@@ -459,7 +459,6 @@ process_exit (void) {
 	palloc_free_multiple(curr->descriptor_table, 3);
 	file_close(curr->running_executable);
 	process_cleanup ();
-	//for(;;);
 	printf("^^^^^^^^^^^^^^^\n");
 	printf("%d\n", curr->exit_status);
 	sema_up(&curr->wait_sema);
@@ -841,7 +840,7 @@ static bool setup_stack(struct intr_frame *if_)
 	uint8_t *kpage;
 	bool success=false;
 
-	kpage=palloc_get_multiple(PAL_USER | PAL_ZERO, 1);
+	kpage=palloc_get_page(PAL_USER | PAL_ZERO);
 	if (kpage!=NULL)
 	{
 		success=install_page (((uint8_t *)USER_STACK)-PGSIZE, kpage, true);	
